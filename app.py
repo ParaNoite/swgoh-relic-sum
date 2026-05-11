@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import parse_qs
 
 DATA_FILE = Path(__file__).resolve().parent / "data" / "upgrade_material_costs.json"
+BIND_ALL_HOST = "0.0.0.0"
 RELIC_TIERS = [f"R{i}" for i in range(1, 11)]
 MATERIAL_FIELDS = [
     ("金金金钱", "金金金钱"),
@@ -79,6 +80,8 @@ def save_data(data: dict, data_file: Path = DATA_FILE) -> None:
 
 
 def as_int(value: str | None) -> int:
+    if value is None:
+        return 0
     try:
         return max(0, int(value))
     except (TypeError, ValueError):
@@ -198,7 +201,7 @@ class MaterialCostHandler(BaseHTTPRequestHandler):
 def run_server(host: str = "127.0.0.1", port: int = 8000) -> None:
     ensure_data_file()
     server = ThreadingHTTPServer((host, port), MaterialCostHandler)
-    display_host = "127.0.0.1" if host == "0.0.0.0" else host
+    display_host = "127.0.0.1" if host == BIND_ALL_HOST else host
     print(f"Open http://{display_host}:{port} in your browser")
     server.serve_forever()
 
