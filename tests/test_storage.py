@@ -22,6 +22,13 @@ class StorageTests(unittest.TestCase):
             loaded = load_data(data_file)
             self.assertEqual(123, loaded["upgrade_material_costs"][0]["carbonite_circuit_board"])
 
+    def test_load_data_resets_invalid_json(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            data_file = Path(tmp_dir) / "upgrade.json"
+            data_file.write_text("not json", encoding="utf-8")
+            loaded = load_data(data_file)
+            self.assertEqual(9, len(loaded["upgrade_material_costs"]))
+
 
 if __name__ == "__main__":
     unittest.main()

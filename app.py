@@ -40,7 +40,12 @@ def ensure_data_file(data_file: Path = DATA_FILE) -> None:
 
 def load_data(data_file: Path = DATA_FILE) -> dict:
     ensure_data_file(data_file)
-    return json.loads(data_file.read_text(encoding="utf-8"))
+    try:
+        return json.loads(data_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        default_data = build_default_data()
+        save_data(default_data, data_file)
+        return default_data
 
 
 def save_data(data: dict, data_file: Path = DATA_FILE) -> None:
@@ -124,6 +129,7 @@ def render_page(data: dict, message: str = "") -> bytes:
 
 class MaterialCostHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
+        """Render the local table GUI, auto-initializing/resetting invalid data when needed."""
         data = load_data()
         body = render_page(data)
         self.send_response(HTTPStatus.OK)
@@ -133,6 +139,7 @@ class MaterialCostHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self) -> None:  # noqa: N802
+        """Handle /save form submission; return 404 for non-/save POST paths."""
         if self.path != "/save":
             self.send_error(HTTPStatus.NOT_FOUND)
             return
@@ -143,7 +150,8 @@ class MaterialCostHandler(BaseHTTPRequestHandler):
 
         rows = []
         for idx in range(1, 10):
-            row = {"upgrade_index": as_int(form.get(f"upgrade_index_{idx}", [str(idx)])[0]) or idx}
+            parsed_upgrade_index = as_int(form.get(f"upgrade_index_{idx}", [str(idx)])[0])
+            row = {"upgrade_index": parsed_upgrade_index if parsed_upgrade_index >= 1 else idx}
             for material in MATERIAL_COLUMNS:
                 row[material] = as_int(form.get(f"{material}_{idx}", ["0"])[0])
             rows.append(row)
@@ -165,7 +173,8 @@ class MaterialCostHandler(BaseHTTPRequestHandler):
 def run_server(host: str = "127.0.0.1", port: int = 8000) -> None:
     ensure_data_file()
     server = ThreadingHTTPServer((host, port), MaterialCostHandler)
-    print(f"Open http://{host}:{port} in your browser")
+    open_host = "127.0.0.1" if host == "0.0.0.0" else host
+    print(f"Open http://{open_host}:{port} in your browser")
     server.serve_forever()
 
 
