@@ -1,14 +1,18 @@
 from __future__ import annotations
 
-import html
 import json
-from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import math
 from pathlib import Path
-from urllib.parse import parse_qs
+
+try:
+    import tkinter as tk
+    from tkinter import messagebox, ttk
+except ModuleNotFoundError:  # pragma: no cover
+    tk = None
+    messagebox = None
+    ttk = None
 
 DATA_FILE = Path(__file__).resolve().parent / "data" / "upgrade_material_costs.json"
-BIND_ALL_HOST = "0.0.0.0"
 RELIC_TIERS = [f"R{i}" for i in range(1, 11)]
 MATERIAL_FIELDS = [
     ("金金金钱", "金金金钱"),
@@ -53,7 +57,16 @@ def build_default_data() -> dict:
     return {
         "model_info": "预留：请在此填写你使用的模型说明",
         "upgrade_material_costs": rows,
+        "upgrade_records": [],
+        "daily_income": {field: 0 for field, _label in MATERIAL_FIELDS},
     }
+
+
+def as_int(value: object) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
 
 
 def ensure_data_file(data_file: Path = DATA_FILE) -> None:
@@ -62,14 +75,62 @@ def ensure_data_file(data_file: Path = DATA_FILE) -> None:
         save_data(build_default_data(), data_file)
 
 
+def normalize_data(data: dict) -> dict:
+    default = build_default_data()
+
+    if not isinstance(data, dict):
+        return default
+
+    rows = data.get("upgrade_material_costs")
+    if not isinstance(rows, list) or len(rows) != len(RELIC_TIERS):
+        rows = default["upgrade_material_costs"]
+
+    normalized_rows = []
+    for idx, fallback_row in enumerate(default["upgrade_material_costs"]):
+        source = rows[idx] if idx < len(rows) and isinstance(rows[idx], dict) else {}
+        row = {"升级阶段": str(source.get("升级阶段", fallback_row["升级阶段"]))}
+        for field, _label in MATERIAL_FIELDS:
+            row[field] = as_int(source.get(field, fallback_row[field]))
+        normalized_rows.append(row)
+
+    records = data.get("upgrade_records")
+    normalized_records = []
+    if isinstance(records, list):
+        for item in records:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("角色", "")).strip()
+            from_r = as_int(item.get("fromR", 0))
+            to_r = as_int(item.get("toR", 0))
+            if name and 1 <= from_r <= 10 and 1 <= to_r <= 10 and to_r > from_r:
+                normalized_records.append({"角色": name, "fromR": from_r, "toR": to_r})
+
+    daily_income = data.get("daily_income")
+    normalized_income = {field: 0 for field, _label in MATERIAL_FIELDS}
+    if isinstance(daily_income, dict):
+        for field, _label in MATERIAL_FIELDS:
+            normalized_income[field] = as_int(daily_income.get(field, 0))
+
+    return {
+        "model_info": str(data.get("model_info", default["model_info"])),
+        "upgrade_material_costs": normalized_rows,
+        "upgrade_records": normalized_records,
+        "daily_income": normalized_income,
+    }
+
+
 def load_data(data_file: Path = DATA_FILE) -> dict:
     ensure_data_file(data_file)
     try:
-        return json.loads(data_file.read_text(encoding="utf-8"))
+        loaded = json.loads(data_file.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        default_data = build_default_data()
-        save_data(default_data, data_file)
-        return default_data
+        default = build_default_data()
+        save_data(default, data_file)
+        return default
+
+    normalized = normalize_data(loaded)
+    save_data(normalized, data_file)
+    return normalized
 
 
 def save_data(data: dict, data_file: Path = DATA_FILE) -> None:
@@ -79,132 +140,201 @@ def save_data(data: dict, data_file: Path = DATA_FILE) -> None:
     )
 
 
-def as_int(value: str | None) -> int:
-    if value is None:
-        return 0
-    try:
-        return max(0, int(value))
-    except (TypeError, ValueError):
-        return 0
+def empty_material_totals() -> dict:
+    return {field: 0 for field, _label in MATERIAL_FIELDS}
 
 
-def render_table_rows(rows: list[dict]) -> str:
-    rendered_rows = []
-    for row_index, row in enumerate(rows, start=1):
-        cells = [
-            (
-                f'<td><input type="number" min="0" name="{html.escape(field)}_{row_index}" '
-                f'value="{as_int(str(row.get(field, 0)))}"></td>'
-            )
-            for field, _label in MATERIAL_FIELDS
-        ]
-        rendered_rows.append(
-            "<tr>"
-            f'<td><input type="text" name="升级阶段_{row_index}" '
-            f'value="{html.escape(str(row.get("升级阶段", f"R{row_index}")))}"></td>'
-            + "".join(cells)
-            + "</tr>"
-        )
-    return "\n".join(rendered_rows)
+def calculate_record_materials(record: dict, cost_rows: list[dict]) -> dict:
+    totals = empty_material_totals()
+    from_r = as_int(record.get("fromR"))
+    to_r = as_int(record.get("toR"))
+    if not (1 <= from_r <= 10 and 1 <= to_r <= 10 and to_r > from_r):
+        return totals
+
+    for target_tier in range(from_r + 1, to_r + 1):
+        row = cost_rows[target_tier - 1]
+        for field, _label in MATERIAL_FIELDS:
+            totals[field] += as_int(row.get(field, 0))
+    return totals
 
 
-def render_page(data: dict, message: str = "") -> bytes:
-    header = "".join(f"<th>{html.escape(label)}</th>" for _field, label in MATERIAL_FIELDS)
-    notice = f'<p class="notice">{html.escape(message)}</p>' if message else ""
-    page = f"""<!doctype html>
-<html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8">
-    <title>SWGOH Relic 材料容器</title>
-    <style>
-      body {{ font-family: Arial, sans-serif; margin: 20px; }}
-      table {{ border-collapse: collapse; width: 100%; font-size: 12px; }}
-      th, td {{ border: 1px solid #ddd; padding: 6px; text-align: center; }}
-      th {{ background: #f0f0f0; }}
-      input[type='number'] {{ width: 70px; }}
-      input[type='text'] {{ width: 60px; }}
-      .notice {{ color: #1a7f37; font-weight: bold; }}
-      .model-box {{ margin: 12px 0; }}
-      .model-box input {{ width: 460px; }}
-    </style>
-  </head>
-  <body>
-    <h1>SWGOH 升级材料容器（本地）</h1>
-    <p>模型说明（预留，可本地修改）：</p>
-    {notice}
-    <form method="post" action="/save">
-      <div class="model-box">
-        <input type="text" name="model_info" value="{html.escape(str(data.get("model_info", "")))}">
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>升级阶段</th>{header}
-          </tr>
-        </thead>
-        <tbody>
-          {render_table_rows(data.get("upgrade_material_costs", []))}
-        </tbody>
-      </table>
-      <p><button type="submit">保存到本地 JSON</button></p>
-    </form>
-  </body>
-</html>
-"""
-    return page.encode("utf-8")
+def calculate_total_materials(records: list[dict], cost_rows: list[dict]) -> dict:
+    totals = empty_material_totals()
+    for record in records:
+        record_total = calculate_record_materials(record, cost_rows)
+        for field, _label in MATERIAL_FIELDS:
+            totals[field] += record_total[field]
+    return totals
 
 
-class MaterialCostHandler(BaseHTTPRequestHandler):
-    def do_GET(self) -> None:  # noqa: N802
-        """Render the local table GUI, auto-initializing/resetting invalid data when needed."""
-        data = load_data()
-        body = render_page(data)
-        self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+def calculate_eta_days(total_materials: dict, daily_income: dict) -> dict:
+    result = {}
+    for field, _label in MATERIAL_FIELDS:
+        need = as_int(total_materials.get(field, 0))
+        income = as_int(daily_income.get(field, 0))
+        if need == 0:
+            result[field] = 0
+        elif income == 0:
+            result[field] = None
+        else:
+            result[field] = math.ceil(need / income)
+    return result
 
-    def do_POST(self) -> None:  # noqa: N802
-        """Handle /save form submission; return 404 for non-/save POST paths."""
-        if self.path != "/save":
-            self.send_error(HTTPStatus.NOT_FOUND)
-            return
 
-        length = int(self.headers.get("Content-Length", "0"))
-        payload = self.rfile.read(length).decode("utf-8")
-        form = parse_qs(payload)
+if tk is not None:
 
-        rows = []
-        for idx in range(1, len(RELIC_TIERS) + 1):
-            row = {
-                "升级阶段": form.get(f"升级阶段_{idx}", [f"R{idx}"])[0] or f"R{idx}",
+    class DesktopApp(tk.Tk):
+        def __init__(self) -> None:
+            super().__init__()
+            self.title("SWGOH Relic 材料汇总")
+            self.geometry("1450x760")
+
+            self.data = load_data()
+            self.records = list(self.data.get("upgrade_records", []))
+            self.daily_income_vars = {
+                field: tk.StringVar(value=str(self.data["daily_income"].get(field, 0)))
+                for field, _label in MATERIAL_FIELDS
             }
+
+            self.name_var = tk.StringVar()
+            self.from_var = tk.StringVar(value="1")
+            self.to_var = tk.StringVar(value="2")
+
+            self._build_ui()
+            self.refresh_records_view()
+            self.refresh_result_view()
+
+        def _build_ui(self) -> None:
+            input_frame = ttk.LabelFrame(self, text="角色升级输入")
+            input_frame.pack(fill="x", padx=10, pady=8)
+
+            ttk.Label(input_frame, text="角色名字").grid(row=0, column=0, padx=5, pady=8)
+            ttk.Entry(input_frame, textvariable=self.name_var, width=24).grid(row=0, column=1, padx=5, pady=8)
+
+            ttk.Label(input_frame, text="fromR").grid(row=0, column=2, padx=5, pady=8)
+            ttk.Entry(input_frame, textvariable=self.from_var, width=6).grid(row=0, column=3, padx=5, pady=8)
+
+            ttk.Label(input_frame, text="toR").grid(row=0, column=4, padx=5, pady=8)
+            ttk.Entry(input_frame, textvariable=self.to_var, width=6).grid(row=0, column=5, padx=5, pady=8)
+
+            ttk.Button(input_frame, text="添加记录", command=self.add_record).grid(row=0, column=6, padx=8, pady=8)
+            ttk.Button(input_frame, text="删除选中", command=self.delete_selected_record).grid(row=0, column=7, padx=8, pady=8)
+
+            records_frame = ttk.LabelFrame(self, text="已存储升级记录")
+            records_frame.pack(fill="x", padx=10, pady=8)
+
+            self.records_tree = ttk.Treeview(records_frame, columns=("角色", "fromR", "toR"), show="headings", height=6)
+            self.records_tree.heading("角色", text="角色")
+            self.records_tree.heading("fromR", text="fromR")
+            self.records_tree.heading("toR", text="toR")
+            self.records_tree.column("角色", width=220, anchor="center")
+            self.records_tree.column("fromR", width=80, anchor="center")
+            self.records_tree.column("toR", width=80, anchor="center")
+            self.records_tree.pack(fill="x", padx=8, pady=8)
+
+            income_frame = ttk.LabelFrame(self, text="每日材料收入")
+            income_frame.pack(fill="x", padx=10, pady=8)
+
+            for idx, (field, _label) in enumerate(MATERIAL_FIELDS):
+                row = idx // 8
+                col = (idx % 8) * 2
+                ttk.Label(income_frame, text=field).grid(row=row, column=col, padx=4, pady=4, sticky="e")
+                ttk.Entry(income_frame, textvariable=self.daily_income_vars[field], width=8).grid(
+                    row=row,
+                    column=col + 1,
+                    padx=4,
+                    pady=4,
+                    sticky="w",
+                )
+
+            action_frame = ttk.Frame(self)
+            action_frame.pack(fill="x", padx=10, pady=8)
+            ttk.Button(action_frame, text="保存数据", command=self.save_all_data).pack(side="left", padx=6)
+            ttk.Button(action_frame, text="重新计算", command=self.refresh_result_view).pack(side="left", padx=6)
+
+            result_frame = ttk.LabelFrame(self, text="材料总需求 + 攒齐时间")
+            result_frame.pack(fill="both", expand=True, padx=10, pady=8)
+
+            self.result_tree = ttk.Treeview(
+                result_frame,
+                columns=("材料", "总需求", "每日收入", "攒齐天数"),
+                show="headings",
+                height=14,
+            )
+            for col, width in (("材料", 150), ("总需求", 120), ("每日收入", 120), ("攒齐天数", 120)):
+                self.result_tree.heading(col, text=col)
+                self.result_tree.column(col, width=width, anchor="center")
+            self.result_tree.pack(fill="both", expand=True, padx=8, pady=8)
+
+        def add_record(self) -> None:
+            name = self.name_var.get().strip()
+            from_r = as_int(self.from_var.get())
+            to_r = as_int(self.to_var.get())
+
+            if not name:
+                messagebox.showwarning("输入错误", "请先输入角色名字")
+                return
+            if not (1 <= from_r <= 10 and 1 <= to_r <= 10 and to_r > from_r):
+                messagebox.showwarning("输入错误", "fromR / toR 必须在 1~10 且 toR > fromR")
+                return
+
+            self.records.append({"角色": name, "fromR": from_r, "toR": to_r})
+            self.refresh_records_view()
+            self.refresh_result_view()
+
+        def delete_selected_record(self) -> None:
+            selected = self.records_tree.selection()
+            if not selected:
+                return
+
+            indexes = sorted((self.records_tree.index(item) for item in selected), reverse=True)
+            for idx in indexes:
+                if 0 <= idx < len(self.records):
+                    self.records.pop(idx)
+
+            self.refresh_records_view()
+            self.refresh_result_view()
+
+        def refresh_records_view(self) -> None:
+            for item in self.records_tree.get_children():
+                self.records_tree.delete(item)
+
+            for record in self.records:
+                self.records_tree.insert(
+                    "",
+                    "end",
+                    values=(record.get("角色", ""), record.get("fromR", 0), record.get("toR", 0)),
+                )
+
+        def _collect_daily_income(self) -> dict:
+            return {field: as_int(var.get()) for field, var in self.daily_income_vars.items()}
+
+        def refresh_result_view(self) -> None:
+            daily_income = self._collect_daily_income()
+            totals = calculate_total_materials(self.records, self.data["upgrade_material_costs"])
+            eta = calculate_eta_days(totals, daily_income)
+
+            for item in self.result_tree.get_children():
+                self.result_tree.delete(item)
+
             for field, _label in MATERIAL_FIELDS:
-                row[field] = as_int(form.get(f"{field}_{idx}", ["0"])[0])
-            rows.append(row)
+                days = eta[field]
+                days_text = "∞" if days is None else str(days)
+                self.result_tree.insert("", "end", values=(field, totals[field], daily_income[field], days_text))
 
-        data = {
-            "model_info": form.get("model_info", [""])[0],
-            "upgrade_material_costs": rows,
-        }
-        save_data(data)
-
-        body = render_page(data, message="已保存")
-        self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        def save_all_data(self) -> None:
+            self.data["upgrade_records"] = list(self.records)
+            self.data["daily_income"] = self._collect_daily_income()
+            save_data(self.data)
+            messagebox.showinfo("保存成功", f"已保存到 {DATA_FILE}")
 
 
-def run_server(host: str = "127.0.0.1", port: int = 8000) -> None:
-    ensure_data_file()
-    server = ThreadingHTTPServer((host, port), MaterialCostHandler)
-    display_host = "127.0.0.1" if host == BIND_ALL_HOST else host
-    print(f"Open http://{display_host}:{port} in your browser")
-    server.serve_forever()
+def run_app() -> None:
+    if tk is None:
+        raise RuntimeError("当前 Python 环境缺少 tkinter，无法启动桌面 GUI。")
+    app = DesktopApp()
+    app.mainloop()
 
 
 if __name__ == "__main__":
-    run_server()
+    run_app()
