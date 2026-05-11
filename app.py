@@ -8,27 +8,50 @@ from pathlib import Path
 from urllib.parse import parse_qs
 
 DATA_FILE = Path(__file__).resolve().parent / "data" / "upgrade_material_costs.json"
-MATERIAL_COLUMNS = [
-    "carbonite_circuit_board",
-    "bronze_wiring",
-    "chromium_transistor",
-    "auerodium_heatsink",
-    "electrium_conductor",
-    "zinbiddle_card",
-    "impulse_detector",
-    "aeromagnifier",
-    "gyrda_keypad",
-    "droid_brain",
+RELIC_TIERS = [f"R{i}" for i in range(1, 11)]
+MATERIAL_FIELDS = [
+    ("金金金钱", "金金金钱"),
+    ("灰信号", "灰信号"),
+    ("绿信号", "绿信号"),
+    ("蓝信号", "蓝信号"),
+    ("暗信号", "暗信号"),
+    ("电路板", "电路板"),
+    ("青铜线缆", "青铜线缆"),
+    ("铬晶体管", "铬晶体管"),
+    ("奥罗德散热器", "奥罗德散热器"),
+    ("电金导体", "电金导体"),
+    ("金必得卡牌", "金必得卡牌"),
+    ("脉冲放大", "脉冲放大"),
+    ("航空放大", "航空放大"),
+    ("键盘", "键盘"),
+    ("两片东西", "两片东西"),
+    ("最牛逼那个", "最牛逼那个"),
+]
+DEFAULT_COSTS = [
+    [10, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [25, 15, 0, 0, 0, 30, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [50, 20, 15, 0, 0, 30, 40, 20, 0, 0, 0, 0, 0, 0, 0, 0],
+    [75, 20, 25, 0, 0, 30, 40, 40, 0, 0, 0, 0, 0, 0, 0, 0],
+    [100, 20, 25, 15, 0, 30, 40, 30, 20, 0, 0, 0, 0, 0, 0, 0],
+    [250, 20, 25, 25, 0, 20, 30, 30, 20, 20, 0, 0, 0, 0, 0, 0],
+    [500, 20, 25, 35, 0, 20, 30, 20, 20, 20, 10, 0, 0, 0, 0, 0],
+    [1000, 20, 25, 45, 0, 0, 0, 20, 20, 20, 20, 20, 20, 0, 0, 0],
+    [1500, 0, 30, 55, 0, 0, 0, 0, 0, 20, 20, 20, 20, 20, 20, 0],
+    [2000, 0, 25, 45, 15, 0, 0, 0, 0, 0, 0, 20, 20, 20, 20, 20],
 ]
 
 
 def build_default_data() -> dict:
+    rows = []
+    for tier, costs in zip(RELIC_TIERS, DEFAULT_COSTS):
+        row = {"升级阶段": tier}
+        for (field, _label), value in zip(MATERIAL_FIELDS, costs):
+            row[field] = value
+        rows.append(row)
+
     return {
         "model_info": "预留：请在此填写你使用的模型说明",
-        "upgrade_material_costs": [
-            {"upgrade_index": idx, **{material: 0 for material in MATERIAL_COLUMNS}}
-            for idx in range(1, 10)
-        ],
+        "upgrade_material_costs": rows,
     }
 
 
@@ -55,7 +78,7 @@ def save_data(data: dict, data_file: Path = DATA_FILE) -> None:
     )
 
 
-def as_int(value: str) -> int:
+def as_int(value: str | None) -> int:
     try:
         return max(0, int(value))
     except (TypeError, ValueError):
@@ -64,18 +87,18 @@ def as_int(value: str) -> int:
 
 def render_table_rows(rows: list[dict]) -> str:
     rendered_rows = []
-    for row in rows:
+    for row_index, row in enumerate(rows, start=1):
         cells = [
             (
-                f'<td><input type="number" min="0" name="{html.escape(material)}_{row["upgrade_index"]}" '
-                f'value="{as_int(str(row.get(material, 0)))}"></td>'
+                f'<td><input type="number" min="0" name="{html.escape(field)}_{row_index}" '
+                f'value="{as_int(str(row.get(field, 0)))}"></td>'
             )
-            for material in MATERIAL_COLUMNS
+            for field, _label in MATERIAL_FIELDS
         ]
         rendered_rows.append(
             "<tr>"
-            f'<td><input type="number" min="1" name="upgrade_index_{row["upgrade_index"]}" '
-            f'value="{as_int(str(row["upgrade_index"]))}"></td>'
+            f'<td><input type="text" name="升级阶段_{row_index}" '
+            f'value="{html.escape(str(row.get("升级阶段", f"R{row_index}")))}"></td>'
             + "".join(cells)
             + "</tr>"
         )
@@ -83,7 +106,7 @@ def render_table_rows(rows: list[dict]) -> str:
 
 
 def render_page(data: dict, message: str = "") -> bytes:
-    header = "".join(f"<th>{html.escape(material)}</th>" for material in MATERIAL_COLUMNS)
+    header = "".join(f"<th>{html.escape(label)}</th>" for _field, label in MATERIAL_FIELDS)
     notice = f'<p class="notice">{html.escape(message)}</p>' if message else ""
     page = f"""<!doctype html>
 <html lang="zh-CN">
@@ -95,7 +118,8 @@ def render_page(data: dict, message: str = "") -> bytes:
       table {{ border-collapse: collapse; width: 100%; font-size: 12px; }}
       th, td {{ border: 1px solid #ddd; padding: 6px; text-align: center; }}
       th {{ background: #f0f0f0; }}
-      input[type='number'] {{ width: 78px; }}
+      input[type='number'] {{ width: 70px; }}
+      input[type='text'] {{ width: 60px; }}
       .notice {{ color: #1a7f37; font-weight: bold; }}
       .model-box {{ margin: 12px 0; }}
       .model-box input {{ width: 460px; }}
@@ -112,7 +136,7 @@ def render_page(data: dict, message: str = "") -> bytes:
       <table>
         <thead>
           <tr>
-            <th>upgrade_index</th>{header}
+            <th>升级阶段</th>{header}
           </tr>
         </thead>
         <tbody>
@@ -149,11 +173,12 @@ class MaterialCostHandler(BaseHTTPRequestHandler):
         form = parse_qs(payload)
 
         rows = []
-        for idx in range(1, 10):
-            parsed_upgrade_index = as_int(form.get(f"upgrade_index_{idx}", [str(idx)])[0])
-            row = {"upgrade_index": parsed_upgrade_index if parsed_upgrade_index >= 1 else idx}
-            for material in MATERIAL_COLUMNS:
-                row[material] = as_int(form.get(f"{material}_{idx}", ["0"])[0])
+        for idx in range(1, len(RELIC_TIERS) + 1):
+            row = {
+                "升级阶段": form.get(f"升级阶段_{idx}", [f"R{idx}"])[0] or f"R{idx}",
+            }
+            for field, _label in MATERIAL_FIELDS:
+                row[field] = as_int(form.get(f"{field}_{idx}", ["0"])[0])
             rows.append(row)
 
         data = {
@@ -173,8 +198,8 @@ class MaterialCostHandler(BaseHTTPRequestHandler):
 def run_server(host: str = "127.0.0.1", port: int = 8000) -> None:
     ensure_data_file()
     server = ThreadingHTTPServer((host, port), MaterialCostHandler)
-    open_host = "127.0.0.1" if host == "0.0.0.0" else host
-    print(f"Open http://{open_host}:{port} in your browser")
+    display_host = "127.0.0.1" if host == "0.0.0.0" else host
+    print(f"Open http://{display_host}:{port} in your browser")
     server.serve_forever()
 
 
