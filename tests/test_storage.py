@@ -27,13 +27,13 @@ class StorageTests(unittest.TestCase):
             data_file = Path(tmp_dir) / "upgrade.json"
             original = build_default_data()
             original["upgrade_material_costs"][0]["电路板"] = 123
-            original["upgrade_records"].append({"角色": "波霸", "fromR": 1, "toR": 3})
+            original["upgrade_records"].append({"角色": "CharacterA", "fromR": 1, "toR": 3})
             original["daily_income"]["电路板"] = 15
             save_data(original, data_file)
 
             loaded = load_data(data_file)
             self.assertEqual(123, loaded["upgrade_material_costs"][0]["电路板"])
-            self.assertEqual("波霸", loaded["upgrade_records"][0]["角色"])
+            self.assertEqual("CharacterA", loaded["upgrade_records"][0]["角色"])
             self.assertEqual(15, loaded["daily_income"]["电路板"])
 
     def test_load_data_resets_invalid_json(self):
@@ -46,14 +46,14 @@ class StorageTests(unittest.TestCase):
 
     def test_material_sum_and_eta(self):
         data = build_default_data()
-        record = {"角色": "博斯克", "fromR": 1, "toR": 3}
+        record = {"角色": "CharacterA", "fromR": 1, "toR": 3}
         record_total = calculate_record_materials(record, data["upgrade_material_costs"])
         self.assertEqual(75, record_total["金金金钱"])
         self.assertEqual(35, record_total["灰信号"])
 
         total = calculate_total_materials([
-            {"角色": "博斯克", "fromR": 1, "toR": 3},
-            {"角色": "波霸", "fromR": 1, "toR": 2},
+            {"角色": "CharacterA", "fromR": 1, "toR": 3},
+            {"角色": "CharacterB", "fromR": 1, "toR": 2},
         ], data["upgrade_material_costs"])
         self.assertEqual(100, total["金金金钱"])
 
