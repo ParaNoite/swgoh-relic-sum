@@ -1,0 +1,122 @@
+{
+  "model_info": "预留：请在此填写你使用的模型说明",
+  "upgrade_material_costs": [
+    {
+      "upgrade_index": 1,
+      "carbonite_circuit_board": 0,
+      "bronze_wiring": 0,
+      "chromium_transistor": 0,
+      "auerodium_heatsink": 0,
+      "electrium_conductor": 0,
+      "zinbiddle_card": 0,
+      "impulse_detector": 0,
+      "aeromagnifier": 0,
+      "gyrda_keypad": 0,
+      "droid_brain": 0
+    },
+    {
+      "upgrade_index": 2,
+      "carbonite_circuit_board": 0,
+      "bronze_wiring": 0,
+      "chromium_transistor": 0,
+      "auerodium_heatsink": 0,
+      "electrium_conductor": 0,
+      "zinbiddle_card": 0,
+      "impulse_detector": 0,
+      "aeromagnifier": 0,
+      "gyrda_keypad": 0,
+      "droid_brain": 0
+    },
+    {
+      "upgrade_index": 3,
+      "carbonite_circuit_board": 0,
+      "bronze_wiring": 0,
+      "chromium_transistor": 0,
+      "auerodium_heatsink": 0,
+      "electrium_conductor": 0,
+      "zinbiddle_card": 0,
+      "impulse_detector": 0,
+      "aeromagnifier": 0,
+      "gyrda_keypad": 0,
+      "droid_brain": 0
+    },
+    {
+      "upgrade_index": 4,
+      "carbonite_circuit_board": 0,
+      "bronze_wiring": 0,
+      "chromium_transistor": 0,
+      "auerodium_heatsink": 0,
+      "electrium_conductor": 0,
+      "zinbiddle_card": 0,
+      "impulse_detector": 0,
+      "aeromagnifier": 0,
+      "gyrda_keypad": 0,
+      "droid_brain": 0
+    },
+    {
+      "upgrade_index": 5,
+      "carbonite_circuit_board": 0,
+      "bronze_wiring": 0,
+      "chromium_transistor": 0,
+      "auerodium_heatsink": 0,
+      "electrium_conductor": 0,
+      "zinbiddle_card": 0,
+      "impulse_detector": 0,
+      "aeromagnifier": 0,
+      "gyrda_keypad": 0,
+      "droid_brain": 0
+    },
+    {
+      "upgrade_index": 6,
+      "carbonite_circuit_board": 0,
+      "bronze_wiring": 0,
+      "chromium_transistor": 0,
+      "auerodium_heatsink": 0,
+      "electrium_conductor": 0,
+      "zinbiddle_card": 0,
+      "impulse_detector": 0,
+      "aeromagnifier": 0,
+      "gyrda_keypad": 0,
+      "droid_brain": 0
+    },
+    {
+      "upgrade_index": 7,
+      "carbonite_circuit_board": 0,
+      "bronze_wiring": 0,
+      "chromium_transistor": 0,
+      "auerodium_heatsink": 0,
+      "electrium_conductor": 0,
+      "zinbiddle_card": 0,
+      "impulse_detector": 0,
+      "aeromagnifier": 0,
+      "gyrda_keypad": 0,
+      "droid_brain": 0
+    },
+    {
+      "upgrade_index": 8,
+      "carbonite_circuit_board": 0,
+      "bronze_wiring": 0,
+      "chromium_transistor": 0,
+      "auerodium_heatsink": 0,
+      "electrium_conductor": 0,
+      "zinbiddle_card": 0,
+      "impulse_detector": 0,
+      "aeromagnifier": 0,
+      "gyrda_keypad": 0,
+      "droid_brain": 0
+    },
+    {
+      "upgrade_index": 9,
+      "carbonite_circuit_board": 0,
+      "bronze_wiring": 0,
+      "chromium_transistor": 0,
+      "auerodium_heatsink": 0,
+      "electrium_conductor": 0,
+      "zinbiddle_card": 0,
+      "impulse_detector": 0,
+      "aeromagnifier": 0,
+      "gyrda_keypad": 0,
+      "droid_brain": 0
+    }
+  ]
+}
