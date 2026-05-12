@@ -1,19 +1,22 @@
 # swgoh-relic-sum
 
-Python 本地升级材料管理小工具（带基础表格 GUI）。
+Python 本地桌面升级材料管理工具（可打包 EXE）。
 
 ## 功能
-- 预留数据容器：`data/upgrade_material_costs.json`
-- 按 `R1 ~ R10` 记录升级花费
-- 数据容器元素按表格字段预留（如：金金金钱、灰信号、绿信号、蓝信号、暗信号、电路板、青铜线缆、铬晶体管、奥罗德散热器、电金导体、金必得卡牌、脉冲放大、航空放大、键盘、两片东西、最牛逼那个）
-- 本地网页表格 GUI，方便查看、修改、保存
-- 预留“模型说明”字段（可本地填写）
+- 输入角色名 + `fromR` + `toR`，存储多条升级记录
+- 基于 `R1 ~ R10` 材料表，自动汇总所有记录的总材料需求
+- 单独录入每个材料的每日收入，自动计算攒齐天数
+- 本地保存数据到 `data/upgrade_material_costs.json`
 
 ## 本地运行
 ```bash
 python app.py
 ```
 
-浏览器打开：`http://127.0.0.1:8000`
+## 打包 EXE（Windows）
+```bash
+pip install pyinstaller
+pyinstaller --noconfirm --onefile --windowed app.py
+```
 
-点击页面底部按钮可保存回本地 JSON 文件。
+产物在 `dist/app.exe`。
