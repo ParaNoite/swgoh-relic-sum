@@ -24,6 +24,11 @@ class StorageTests(unittest.TestCase):
         self.assertEqual([], data["upgrade_records"])
         self.assertEqual([], data["todo_list"])
         self.assertIn("daily_income", data)
+        self.assertIn("currency_income", data)
+        self.assertIn("currency_inventory", data)
+        self.assertIn("material_inventory", data)
+        self.assertIn("exchange_rates", data)
+        self.assertIn("exchange_limits", data)
 
     def test_load_save_round_trip(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -31,15 +36,35 @@ class StorageTests(unittest.TestCase):
             original = build_default_data()
             original["upgrade_material_costs"][0]["电路板"] = 123
             original["upgrade_records"].append({"角色": "CharacterA", "fromR": 1, "toR": 3})
-            original["todo_list"].append({"角色": "CharacterA", "任务": "Farm gear", "状态": "未完成"})
+            original["todo_list"].append(
+                {
+                    "角色": "CharacterA",
+                    "fromR": 1,
+                    "toR": 3,
+                    "fromSharp": 2,
+                    "toSharp": 5,
+                    "注释": "Farm gear",
+                    "状态": "未完成",
+                }
+            )
             original["daily_income"]["电路板"] = 15
+            original["currency_income"]["红能量"]["daily"] = 20
+            original["currency_inventory"]["红能量"] = 150
+            original["material_inventory"]["灰信号"] = 3
+            original["exchange_rates"]["灰信号"]["price"] = 0.8
+            original["exchange_limits"]["raidmk1"] = 99
             save_data(original, data_file)
 
             loaded = load_data(data_file)
             self.assertEqual(123, loaded["upgrade_material_costs"][0]["电路板"])
             self.assertEqual("CharacterA", loaded["upgrade_records"][0]["角色"])
-            self.assertEqual("Farm gear", loaded["todo_list"][0]["任务"])
+            self.assertEqual("Farm gear", loaded["todo_list"][0]["注释"])
             self.assertEqual(15, loaded["daily_income"]["电路板"])
+            self.assertEqual(20, loaded["currency_income"]["红能量"]["daily"])
+            self.assertEqual(150, loaded["currency_inventory"]["红能量"])
+            self.assertEqual(3, loaded["material_inventory"]["灰信号"])
+            self.assertEqual(0.8, loaded["exchange_rates"]["灰信号"]["price"])
+            self.assertEqual(99, loaded["exchange_limits"]["raidmk1"])
 
     def test_load_data_resets_invalid_json(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -57,21 +82,21 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(35, record_total["灰信号"])
 
         total = calculate_total_materials([
-            {"角色": "CharacterA", "fromR": 1, "toR": 3},
-            {"角色": "CharacterB", "fromR": 1, "toR": 2},
+            {"角色": "CharacterA", "fromR": 1, "toR": 3, "状态": "未完成"},
+            {"角色": "CharacterB", "fromR": 1, "toR": 2, "状态": "完成"},
         ], data["upgrade_material_costs"])
-        self.assertEqual(100, total["金金金钱"])
+        self.assertEqual(75, total["金金金钱"])
 
         eta = calculate_eta_days(total, {"金金金钱": 9, "灰信号": 0})
-        self.assertEqual(12, eta["金金金钱"])
+        self.assertEqual(9, eta["金金金钱"])
         self.assertIsNone(eta["灰信号"])
 
     def test_single_character_cultivation_days(self):
         data = build_default_data()
         records = [
-            {"角色": "CharacterA", "fromR": 1, "toR": 3},
-            {"角色": "CharacterA", "fromR": 3, "toR": 4},
-            {"角色": "CharacterB", "fromR": 1, "toR": 2},
+            {"角色": "CharacterA", "fromR": 1, "toR": 3, "状态": "未完成"},
+            {"角色": "CharacterA", "fromR": 3, "toR": 4, "状态": "未完成"},
+            {"角色": "CharacterB", "fromR": 1, "toR": 2, "状态": "完成"},
         ]
         daily_income = {field: 1000 for field, _label in MATERIAL_FIELDS}
         daily_income["金金金钱"] = 10
@@ -89,7 +114,7 @@ class StorageTests(unittest.TestCase):
 
     def test_single_character_cultivation_days_infinite_when_income_missing(self):
         data = build_default_data()
-        records = [{"角色": "CharacterA", "fromR": 1, "toR": 2}]
+        records = [{"角色": "CharacterA", "fromR": 1, "toR": 2, "状态": "未完成"}]
         result = calculate_single_character_cultivation(
             records,
             data["upgrade_material_costs"],

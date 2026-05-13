@@ -193,6 +193,7 @@
     }
   ],
   "upgrade_records": [],
+  "todo_list": [],
   "daily_income": {
     "金金金钱": 0,
     "灰信号": 0,
@@ -210,5 +211,152 @@
     "键盘": 0,
     "两片东西": 0,
     "最牛逼那个": 0
+  },
+  "currency_income": {
+    "黄能量": {
+      "daily": 0,
+      "weekly": 0,
+      "monthly": 0
+    },
+    "红能量": {
+      "daily": 0,
+      "weekly": 0,
+      "monthly": 0
+    },
+    "蓝能量": {
+      "daily": 0,
+      "weekly": 0,
+      "monthly": 0
+    },
+    "raidmk1": {
+      "daily": 0,
+      "weekly": 0,
+      "monthly": 0
+    },
+    "raidmk2": {
+      "daily": 0,
+      "weekly": 0,
+      "monthly": 0
+    },
+    "raidmk3": {
+      "daily": 0,
+      "weekly": 0,
+      "monthly": 0
+    },
+    "guildmk1": {
+      "daily": 0,
+      "weekly": 0,
+      "monthly": 0
+    },
+    "guildmk2": {
+      "daily": 0,
+      "weekly": 0,
+      "monthly": 0
+    },
+    "guildmk3": {
+      "daily": 0,
+      "weekly": 0,
+      "monthly": 0
+    }
+  },
+  "currency_inventory": {
+    "黄能量": 0,
+    "红能量": 0,
+    "蓝能量": 0,
+    "raidmk1": 0,
+    "raidmk2": 0,
+    "raidmk3": 0,
+    "guildmk1": 0,
+    "guildmk2": 0,
+    "guildmk3": 0
+  },
+  "material_inventory": {
+    "金金金钱": 0,
+    "灰信号": 0,
+    "绿信号": 0,
+    "蓝信号": 0,
+    "暗信号": 0,
+    "电路板": 0,
+    "青铜线缆": 0,
+    "铬晶体管": 0,
+    "奥罗德散热器": 0,
+    "电金导体": 0,
+    "金必得卡牌": 0,
+    "脉冲放大": 0,
+    "航空放大": 0,
+    "键盘": 0,
+    "两片东西": 0,
+    "最牛逼那个": 0
+  },
+  "exchange_rates": {
+    "金金金钱": {
+      "currency": "红能量",
+      "price": 0.0
+    },
+    "灰信号": {
+      "currency": "guildmk1",
+      "price": 0.6666
+    },
+    "绿信号": {
+      "currency": "guildmk2",
+      "price": 1.0
+    },
+    "蓝信号": {
+      "currency": "guildmk3",
+      "price": 1.5
+    },
+    "暗信号": {
+      "currency": "guildmk3",
+      "price": 0
+    },
+    "电路板": {
+      "currency": "红能量",
+      "price": 0.0
+    },
+    "青铜线缆": {
+      "currency": "raidmk1",
+      "price": 35
+    },
+    "铬晶体管": {
+      "currency": "raidmk1",
+      "price": 40
+    },
+    "奥罗德散热器": {
+      "currency": "raidmk1",
+      "price": 50
+    },
+    "电金导体": {
+      "currency": "raidmk1",
+      "price": 55
+    },
+    "金必得卡牌": {
+      "currency": "raidmk2",
+      "price": 75
+    },
+    "脉冲放大": {
+      "currency": "raidmk2",
+      "price": 100
+    },
+    "航空放大": {
+      "currency": "raidmk3",
+      "price": 285
+    },
+    "键盘": {
+      "currency": "raidmk3",
+      "price": 200
+    },
+    "两片东西": {
+      "currency": "raidmk3",
+      "price": 85
+    },
+    "最牛逼那个": {
+      "currency": "raidmk3",
+      "price": 750
+    }
+  },
+  "exchange_limits": {
+    "raidmk1": 75,
+    "raidmk2": 10,
+    "raidmk3": 5
   }
 }
