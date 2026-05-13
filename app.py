@@ -213,8 +213,6 @@ def normalize_data(data: dict) -> dict:
             note = str(item.get("注释", item.get("任务", ""))).strip()
             status = str(item.get("状态", "未完成")).strip()
             deducted = bool(item.get("已扣除", False))
-            if "已扣除" not in item and status == "完成":
-                deducted = True
             if status not in TODO_STATUS_OPTIONS:
                 status = "未完成"
             normalized_todos.append(
@@ -230,8 +228,15 @@ def normalize_data(data: dict) -> dict:
                 }
             )
 
-    if not normalized_todos and normalized_records:
+    if normalized_records:
+        existing_keys = {
+            (item.get("角色", ""), item.get("fromR", 0), item.get("toR", 0))
+            for item in normalized_todos
+        }
         for record in normalized_records:
+            key = (record["角色"], record["fromR"], record["toR"])
+            if key in existing_keys:
+                continue
             normalized_todos.append(
                 {
                     "角色": record["角色"],
