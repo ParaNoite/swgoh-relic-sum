@@ -205,6 +205,33 @@ def calculate_total_materials(records: list[dict], cost_rows: list[dict]) -> dic
     return totals
 
 
+def calculate_single_character_cultivation(
+    records: list[dict],
+    cost_rows: list[dict],
+    daily_income: dict,
+    character_name: str,
+) -> dict:
+    name = str(character_name).strip()
+    selected_records = [item for item in records if str(item.get("角色", "")).strip() == name]
+    totals = calculate_total_materials(selected_records, cost_rows)
+    eta = calculate_eta_days(totals, daily_income)
+    max_days = 0
+    has_infinite = False
+    for field, _label in MATERIAL_FIELDS:
+        days = eta[field]
+        if days is None:
+            has_infinite = True
+        else:
+            max_days = max(max_days, days)
+    return {
+        "name": name,
+        "record_count": len(selected_records),
+        "total_materials": totals,
+        "eta": eta,
+        "max_days": None if has_infinite else max_days,
+    }
+
+
 def calculate_eta_days(total_materials: dict, daily_income: dict) -> dict:
     result = {}
     for field, _label in MATERIAL_FIELDS:
@@ -243,14 +270,46 @@ if tk is not None:
             self.todo_name_var = tk.StringVar()
             self.todo_task_var = tk.StringVar()
             self.todo_status_var = tk.StringVar(value=TODO_STATUS_OPTIONS[0])
+            self.single_character_var = tk.StringVar()
+            self.single_character_result_var = tk.StringVar(value="请选择角色后计算培养天数")
             self.rank_sort_var = tk.StringVar(value="总材料")
             self.rank_order_var = tk.StringVar(value="降序")
 
+            self._setup_styles()
             self._build_ui()
             self.refresh_records_view()
             self.refresh_todo_view()
             self.refresh_result_view()
             self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+        def _setup_styles(self) -> None:
+            self.configure(bg="#f5f5f7")
+            style = ttk.Style(self)
+            try:
+                style.theme_use("clam")
+            except tk.TclError:
+                pass
+
+            style.configure(".", background="#f5f5f7", foreground="#1d1d1f", font=("Segoe UI", 10))
+            style.configure("TFrame", background="#f5f5f7")
+            style.configure("TLabel", background="#f5f5f7", foreground="#1d1d1f")
+            style.configure("TLabelframe", background="#f5f5f7")
+            style.configure("TLabelframe.Label", background="#f5f5f7", foreground="#1d1d1f", font=("Segoe UI", 10, "bold"))
+            style.configure("TButton", padding=(10, 6), font=("Segoe UI", 10))
+            style.configure("TEntry", padding=6)
+            style.configure("TCombobox", padding=4)
+            style.configure("TNotebook", background="#f5f5f7", borderwidth=0)
+            style.configure("TNotebook.Tab", padding=(16, 8), font=("Segoe UI", 10, "bold"))
+            style.map("TNotebook.Tab", background=[("selected", "#ffffff"), ("!selected", "#e9e9ee")])
+            style.configure(
+                "Treeview",
+                background="#ffffff",
+                fieldbackground="#ffffff",
+                foreground="#1d1d1f",
+                rowheight=28,
+                borderwidth=0,
+            )
+            style.configure("Treeview.Heading", background="#ececf1", foreground="#1d1d1f", font=("Segoe UI", 10, "bold"))
 
         def _build_ui(self) -> None:
             header_frame = ttk.Frame(self)
@@ -260,16 +319,14 @@ if tk is not None:
             notebook = ttk.Notebook(self)
             notebook.pack(fill="both", expand=True, padx=10, pady=8)
 
-            record_tab = ttk.Frame(notebook)
-            todo_tab = ttk.Frame(notebook)
+            work_tab = ttk.Frame(notebook)
             stats_tab = ttk.Frame(notebook)
             ranking_tab = ttk.Frame(notebook)
-            notebook.add(record_tab, text="升级记录")
-            notebook.add(todo_tab, text="Todo")
+            notebook.add(work_tab, text="升级与Todo")
             notebook.add(stats_tab, text="材料统计")
             notebook.add(ranking_tab, text="排行")
 
-            input_frame = ttk.LabelFrame(record_tab, text="角色升级输入")
+            input_frame = ttk.LabelFrame(work_tab, text="角色升级输入")
             input_frame.pack(fill="x", padx=10, pady=8)
 
             ttk.Label(input_frame, text="角色名字").grid(row=0, column=0, padx=5, pady=6)
@@ -288,7 +345,7 @@ if tk is not None:
             ttk.Button(record_action_frame, text="删除选中", command=self.delete_selected_record).pack(side="left", padx=4)
             ttk.Button(record_action_frame, text="清空选择", command=self.clear_record_selection).pack(side="left", padx=4)
 
-            records_frame = ttk.LabelFrame(record_tab, text="已存储升级记录")
+            records_frame = ttk.LabelFrame(work_tab, text="已存储升级记录")
             records_frame.pack(fill="both", expand=True, padx=10, pady=8)
 
             records_container = ttk.Frame(records_frame)
@@ -306,7 +363,7 @@ if tk is not None:
             record_scroll.pack(side="right", fill="y")
             self.records_tree.bind("<<TreeviewSelect>>", self.on_record_select)
 
-            todo_input_frame = ttk.LabelFrame(todo_tab, text="角色 Todo 输入")
+            todo_input_frame = ttk.LabelFrame(work_tab, text="Todo 注释/任务输入")
             todo_input_frame.pack(fill="x", padx=10, pady=8)
             ttk.Label(todo_input_frame, text="角色名字").grid(row=0, column=0, padx=5, pady=6)
             ttk.Entry(todo_input_frame, textvariable=self.todo_name_var, width=20).grid(row=0, column=1, padx=5, pady=6)
@@ -328,7 +385,7 @@ if tk is not None:
             ttk.Button(todo_action_frame, text="删除选中", command=self.delete_selected_todo).pack(side="left", padx=4)
             ttk.Button(todo_action_frame, text="清空选择", command=self.clear_todo_selection).pack(side="left", padx=4)
 
-            todo_frame = ttk.LabelFrame(todo_tab, text="Todo 列表")
+            todo_frame = ttk.LabelFrame(work_tab, text="Todo 列表")
             todo_frame.pack(fill="both", expand=True, padx=10, pady=8)
             todo_container = ttk.Frame(todo_frame)
             todo_container.pack(fill="both", expand=True, padx=8, pady=8)
@@ -344,6 +401,30 @@ if tk is not None:
             self.todo_tree.pack(side="left", fill="both", expand=True)
             todo_scroll.pack(side="right", fill="y")
             self.todo_tree.bind("<<TreeviewSelect>>", self.on_todo_select)
+
+            single_character_frame = ttk.LabelFrame(stats_tab, text="单角色培养天数")
+            single_character_frame.pack(fill="x", padx=10, pady=8)
+            ttk.Label(single_character_frame, text="角色").grid(row=0, column=0, padx=5, pady=6)
+            self.single_character_combo = ttk.Combobox(
+                single_character_frame,
+                textvariable=self.single_character_var,
+                width=24,
+                state="readonly",
+            )
+            self.single_character_combo.grid(row=0, column=1, padx=5, pady=6)
+            ttk.Button(
+                single_character_frame,
+                text="计算单角色培养天数",
+                command=self.calculate_single_character_days,
+            ).grid(row=0, column=2, padx=6, pady=6, sticky="w")
+            ttk.Label(single_character_frame, textvariable=self.single_character_result_var).grid(
+                row=1,
+                column=0,
+                columnspan=3,
+                padx=5,
+                pady=(0, 6),
+                sticky="w",
+            )
 
             income_frame = ttk.LabelFrame(stats_tab, text="每日材料收入")
             income_frame.pack(fill="x", padx=10, pady=8)
@@ -517,6 +598,7 @@ if tk is not None:
                     "end",
                     values=(record.get("角色", ""), record.get("fromR", 0), record.get("toR", 0)),
                 )
+            self._refresh_single_character_options()
 
         def add_todo(self) -> None:
             name = self.todo_name_var.get().strip()
@@ -596,6 +678,36 @@ if tk is not None:
                     "end",
                     values=(todo.get("角色", ""), todo.get("任务", ""), todo.get("状态", "")),
                 )
+
+        def _refresh_single_character_options(self) -> None:
+            names = sorted({str(record.get("角色", "")).strip() for record in self.records if str(record.get("角色", "")).strip()})
+            self.single_character_combo["values"] = names
+            if self.single_character_var.get() not in names:
+                self.single_character_var.set(names[0] if names else "")
+                if not names:
+                    self.single_character_result_var.set("请先添加角色升级记录")
+
+        def calculate_single_character_days(self) -> None:
+            name = self.single_character_var.get().strip()
+            if not name:
+                messagebox.showwarning("操作提示", "请先选择一个角色")
+                return
+            daily_income = self._collect_daily_income()
+            result = calculate_single_character_cultivation(
+                self.records,
+                self.data["upgrade_material_costs"],
+                daily_income,
+                name,
+            )
+            if result["record_count"] == 0:
+                self.single_character_result_var.set(f"{name} 暂无升级记录")
+                return
+            days = result["max_days"]
+            total_count = sum(result["total_materials"].values())
+            days_text = "∞" if days is None else str(days)
+            self.single_character_result_var.set(
+                f"{name}：记录 {result['record_count']} 条，材料总量 {total_count}，预计培养天数 {days_text} 天"
+            )
 
         def _collect_daily_income(self) -> dict:
             return {field: as_int(var.get()) for field, var in self.daily_income_vars.items()}
