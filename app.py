@@ -51,8 +51,8 @@ MATERIAL_FIELDS = [
     ("脉冲放大", "脉冲放大"),
     ("航空放大", "航空放大"),
     ("键盘", "键盘"),
-    ("两片东西", "两片东西"),
-    ("最牛逼那个", "最牛逼那个"),
+    ("断片", "断片"),
+    ("最牛逼那啥", "最牛逼那啥"),
 ]
 CURRENCY_FIELDS = [
     ("黄能量", "黄能量"),
@@ -88,8 +88,8 @@ DEFAULT_MATERIAL_EXCHANGE = {
     "脉冲放大": ("raidmk2", 100),
     "航空放大": ("raidmk3", 285),
     "键盘": ("raidmk3", 200),
-    "两片东西": ("raidmk3", 85),
-    "最牛逼那个": ("raidmk3", 750),
+    "断片": ("raidmk3", 85),
+    "最牛逼那啥": ("raidmk3", 750),
 }
 DEFAULT_COSTS = [
     [10, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -103,6 +103,25 @@ DEFAULT_COSTS = [
     [1500, 0, 30, 55, 0, 0, 0, 0, 0, 20, 20, 20, 20, 20, 20, 0],
     [2000, 0, 25, 45, 15, 0, 0, 0, 0, 0, 0, 20, 20, 20, 20, 20],
 ]
+LEGACY_MATERIAL_FIELD_ALIASES = {
+    "断片": "两片东西",
+    "最牛逼那啥": "最牛逼那个",
+}
+SIGNAL_EXCHANGE_CURRENCIES = {"guildmk1", "guildmk2", "guildmk3"}
+RAID_EXCHANGE_CURRENCIES = {"raidmk1", "raidmk2", "raidmk3"}
+SIGNAL_MATERIAL_FIELDS = {"灰信号", "绿信号", "蓝信号", "暗信号"}
+RAID_MATERIAL_FIELDS = {
+    "青铜线缆",
+    "铬晶体管",
+    "奥罗德散热器",
+    "电金导体",
+    "金必得卡牌",
+    "脉冲放大",
+    "航空放大",
+    "键盘",
+    "断片",
+    "最牛逼那啥",
+}
 TODO_STATUS_OPTIONS = ["未完成", "完成"]
 
 
@@ -157,6 +176,25 @@ def as_float(value: object) -> float:
         return 0.0
 
 
+def get_material_value(source: dict, field: str, fallback: object = 0) -> object:
+    if not isinstance(source, dict):
+        return fallback
+    if field in source:
+        return source.get(field, fallback)
+    legacy_field = LEGACY_MATERIAL_FIELD_ALIASES.get(field)
+    if legacy_field and legacy_field in source:
+        return source.get(legacy_field, fallback)
+    return fallback
+
+
+def allowed_currencies_for_material(material: str) -> set[str]:
+    if material in SIGNAL_MATERIAL_FIELDS:
+        return set(SIGNAL_EXCHANGE_CURRENCIES)
+    if material in RAID_MATERIAL_FIELDS:
+        return set(RAID_EXCHANGE_CURRENCIES)
+    return {currency for currency, _label in CURRENCY_FIELDS}
+
+
 def ensure_data_file(data_file: Path = DATA_FILE) -> None:
     data_file.parent.mkdir(parents=True, exist_ok=True)
     if not data_file.exists():
@@ -178,7 +216,7 @@ def normalize_data(data: dict) -> dict:
         source = rows[idx] if idx < len(rows) and isinstance(rows[idx], dict) else {}
         row = {"升级阶段": str(source.get("升级阶段", fallback_row["升级阶段"]))}
         for field, _label in MATERIAL_FIELDS:
-            row[field] = as_int(source.get(field, fallback_row[field]))
+            row[field] = as_int(get_material_value(source, field, fallback_row[field]))
         normalized_rows.append(row)
 
     records = data.get("upgrade_records")
@@ -197,7 +235,7 @@ def normalize_data(data: dict) -> dict:
     normalized_income = {field: 0 for field, _label in MATERIAL_FIELDS}
     if isinstance(daily_income, dict):
         for field, _label in MATERIAL_FIELDS:
-            normalized_income[field] = as_float(daily_income.get(field, 0))
+            normalized_income[field] = as_float(get_material_value(daily_income, field, 0))
 
     todo_list = data.get("todo_list")
     normalized_todos = []
@@ -273,16 +311,17 @@ def normalize_data(data: dict) -> dict:
     normalized_material_inventory = {field: 0 for field, _label in MATERIAL_FIELDS}
     if isinstance(material_inventory, dict):
         for field, _label in MATERIAL_FIELDS:
-            normalized_material_inventory[field] = as_float(material_inventory.get(field, 0))
+            normalized_material_inventory[field] = as_float(get_material_value(material_inventory, field, 0))
 
     exchange_rates = data.get("exchange_rates")
     normalized_exchange_rates = build_default_exchange_rates()
     if isinstance(exchange_rates, dict):
         for field, _label in MATERIAL_FIELDS:
-            entry = exchange_rates.get(field)
+            entry = get_material_value(exchange_rates, field)
             if isinstance(entry, dict):
                 currency = str(entry.get("currency", normalized_exchange_rates[field]["currency"])).strip()
-                if currency not in currency_names:
+                allowed_currencies = allowed_currencies_for_material(field)
+                if currency not in currency_names or currency not in allowed_currencies:
                     currency = normalized_exchange_rates[field]["currency"]
                 price = as_float(entry.get("price", normalized_exchange_rates[field]["price"]))
                 normalized_exchange_rates[field] = {"currency": currency, "price": price}
@@ -817,8 +856,8 @@ if tk is not None:
             ttk.Label(rates_frame, text="材料").grid(row=0, column=0, padx=4, pady=4)
             ttk.Label(rates_frame, text="货币").grid(row=0, column=1, padx=4, pady=4)
             ttk.Label(rates_frame, text="单价").grid(row=0, column=2, padx=4, pady=4)
-            currency_options = [currency for currency, _label in CURRENCY_FIELDS]
             for idx, (field, _label) in enumerate(MATERIAL_FIELDS, start=1):
+                currency_options = sorted(allowed_currencies_for_material(field))
                 ttk.Label(rates_frame, text=field).grid(row=idx, column=0, padx=4, pady=4, sticky="e")
                 ttk.Combobox(
                     rates_frame,
@@ -1133,12 +1172,14 @@ if tk is not None:
 
         def _collect_exchange_rates(self) -> dict:
             currency_names = {currency for currency, _label in CURRENCY_FIELDS}
+            default_rates = build_default_exchange_rates()
             rates = {}
             for field, _label in MATERIAL_FIELDS:
                 currency = self.exchange_rate_vars[field]["currency"].get().strip()
                 price = as_float(self.exchange_rate_vars[field]["price"].get())
-                if not currency or currency not in currency_names:
-                    currency = build_default_exchange_rates()[field]["currency"]
+                allowed_currencies = allowed_currencies_for_material(field)
+                if not currency or currency not in currency_names or currency not in allowed_currencies:
+                    currency = default_rates[field]["currency"]
                 rates[field] = {"currency": currency, "price": price}
             return rates
 

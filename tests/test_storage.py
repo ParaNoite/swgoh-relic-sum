@@ -4,6 +4,7 @@ from pathlib import Path
 
 from app import (
     MATERIAL_FIELDS,
+    allowed_currencies_for_material,
     build_default_data,
     calculate_eta_days,
     calculate_record_materials,
@@ -14,7 +15,56 @@ from app import (
 )
 
 
+def load_data_from_dict(data: dict) -> dict:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        data_file = Path(tmp_dir) / "upgrade.json"
+        save_data(data, data_file)
+        return load_data(data_file)
+
+
 class StorageTests(unittest.TestCase):
+    def test_default_material_labels_match_requirement(self):
+        fields = [field for field, _label in MATERIAL_FIELDS]
+        self.assertIn("断片", fields)
+        self.assertIn("最牛逼那啥", fields)
+        self.assertNotIn("两片东西", fields)
+        self.assertNotIn("最牛逼那个", fields)
+
+    def test_normalize_data_supports_legacy_material_keys(self):
+        payload = build_default_data()
+        payload["daily_income"].pop("断片", None)
+        payload["daily_income"].pop("最牛逼那啥", None)
+        payload["daily_income"]["两片东西"] = 8
+        payload["daily_income"]["最牛逼那个"] = 9
+        payload["material_inventory"].pop("断片", None)
+        payload["material_inventory"].pop("最牛逼那啥", None)
+        payload["material_inventory"]["两片东西"] = 11
+        payload["material_inventory"]["最牛逼那个"] = 12
+        payload["exchange_rates"].pop("断片", None)
+        payload["exchange_rates"].pop("最牛逼那啥", None)
+        payload["exchange_rates"]["两片东西"] = {"currency": "raidmk3", "price": 88}
+        payload["exchange_rates"]["最牛逼那个"] = {"currency": "raidmk3", "price": 777}
+        for row in payload["upgrade_material_costs"]:
+            row.pop("断片", None)
+            row.pop("最牛逼那啥", None)
+            row["两片东西"] = 6
+            row["最牛逼那个"] = 7
+
+        normalized = load_data_from_dict(payload)
+        self.assertEqual(8, normalized["daily_income"]["断片"])
+        self.assertEqual(9, normalized["daily_income"]["最牛逼那啥"])
+        self.assertEqual(11, normalized["material_inventory"]["断片"])
+        self.assertEqual(12, normalized["material_inventory"]["最牛逼那啥"])
+        self.assertEqual(88, normalized["exchange_rates"]["断片"]["price"])
+        self.assertEqual(777, normalized["exchange_rates"]["最牛逼那啥"]["price"])
+        self.assertEqual(6, normalized["upgrade_material_costs"][0]["断片"])
+        self.assertEqual(7, normalized["upgrade_material_costs"][0]["最牛逼那啥"])
+
+    def test_exchange_restrictions_by_material(self):
+        self.assertEqual({"guildmk1", "guildmk2", "guildmk3"}, allowed_currencies_for_material("灰信号"))
+        self.assertEqual({"raidmk1", "raidmk2", "raidmk3"}, allowed_currencies_for_material("脉冲放大"))
+        self.assertIn("红能量", allowed_currencies_for_material("电路板"))
+
     def test_default_data_has_upgrade_slots(self):
         data = build_default_data()
         self.assertEqual(10, len(data["upgrade_material_costs"]))
