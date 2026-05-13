@@ -8,9 +8,11 @@ from pathlib import Path
 
 try:
     import tkinter as tk
+    from tkinter import font as tkfont
     from tkinter import messagebox, ttk
 except ModuleNotFoundError:  # pragma: no cover
     tk = None
+    tkfont = None
     messagebox = None
     ttk = None
 
@@ -271,7 +273,7 @@ if tk is not None:
             self.todo_task_var = tk.StringVar()
             self.todo_status_var = tk.StringVar(value=TODO_STATUS_OPTIONS[0])
             self.single_character_var = tk.StringVar()
-            self.single_character_result_var = tk.StringVar(value="请选择角色后计算培养天数")
+            self.single_character_result_var = tk.StringVar(value="请先添加角色升级记录")
             self.rank_sort_var = tk.StringVar(value="总材料")
             self.rank_order_var = tk.StringVar(value="降序")
 
@@ -287,19 +289,27 @@ if tk is not None:
             style = ttk.Style(self)
             try:
                 style.theme_use("clam")
-            except tk.TclError:
-                pass
+            except tk.TclError as exc:
+                print(f"[style] clam theme unavailable: {exc}", file=sys.stderr)
 
-            style.configure(".", background="#f5f5f7", foreground="#1d1d1f", font=("Segoe UI", 10))
+            font_family = "TkDefaultFont"
+            if tkfont is not None:
+                available_fonts = set(tkfont.families())
+                for candidate in ("SF Pro Text", "Helvetica Neue", "Segoe UI", "PingFang SC", "Arial"):
+                    if candidate in available_fonts:
+                        font_family = candidate
+                        break
+
+            style.configure(".", background="#f5f5f7", foreground="#1d1d1f", font=(font_family, 10))
             style.configure("TFrame", background="#f5f5f7")
             style.configure("TLabel", background="#f5f5f7", foreground="#1d1d1f")
             style.configure("TLabelframe", background="#f5f5f7")
-            style.configure("TLabelframe.Label", background="#f5f5f7", foreground="#1d1d1f", font=("Segoe UI", 10, "bold"))
-            style.configure("TButton", padding=(10, 6), font=("Segoe UI", 10))
+            style.configure("TLabelframe.Label", background="#f5f5f7", foreground="#1d1d1f", font=(font_family, 10, "bold"))
+            style.configure("TButton", padding=(10, 6), font=(font_family, 10))
             style.configure("TEntry", padding=6)
             style.configure("TCombobox", padding=4)
             style.configure("TNotebook", background="#f5f5f7", borderwidth=0)
-            style.configure("TNotebook.Tab", padding=(16, 8), font=("Segoe UI", 10, "bold"))
+            style.configure("TNotebook.Tab", padding=(16, 8), font=(font_family, 10, "bold"))
             style.map("TNotebook.Tab", background=[("selected", "#ffffff"), ("!selected", "#e9e9ee")])
             style.configure(
                 "Treeview",
@@ -309,7 +319,7 @@ if tk is not None:
                 rowheight=28,
                 borderwidth=0,
             )
-            style.configure("Treeview.Heading", background="#ececf1", foreground="#1d1d1f", font=("Segoe UI", 10, "bold"))
+            style.configure("Treeview.Heading", background="#ececf1", foreground="#1d1d1f", font=(font_family, 10, "bold"))
 
         def _build_ui(self) -> None:
             header_frame = ttk.Frame(self)
@@ -684,7 +694,9 @@ if tk is not None:
             self.single_character_combo["values"] = names
             if self.single_character_var.get() not in names:
                 self.single_character_var.set(names[0] if names else "")
-                if not names:
+                if names:
+                    self.single_character_result_var.set("请选择角色后计算培养天数")
+                else:
                     self.single_character_result_var.set("请先添加角色升级记录")
 
         def calculate_single_character_days(self) -> None:
