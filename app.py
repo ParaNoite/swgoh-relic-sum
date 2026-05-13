@@ -727,7 +727,7 @@ if tk is not None:
             self.todo_tree.bind("<<TreeviewSelect>>", self.on_todo_select)
 
             single_character_frame = ttk.LabelFrame(stats_tab, text="单角色培养天数")
-            single_character_frame.pack(fill="x", padx=10, pady=8)
+            single_character_frame.pack(fill="both", padx=10, pady=8)
             ttk.Label(single_character_frame, text="角色").grid(row=0, column=0, padx=5, pady=6)
             self.single_character_combo = ttk.Combobox(
                 single_character_frame,
@@ -749,6 +749,25 @@ if tk is not None:
                 pady=(0, 6),
                 sticky="w",
             )
+            single_char_detail_container = ttk.Frame(single_character_frame)
+            single_char_detail_container.grid(row=2, column=0, columnspan=3, padx=5, pady=(0, 6), sticky="nsew")
+            single_character_frame.rowconfigure(2, weight=1)
+            single_character_frame.columnconfigure(0, weight=1)
+            self.single_char_detail_tree = ttk.Treeview(
+                single_char_detail_container,
+                columns=("材料", "总需求", "每日收入", "攒齐天数"),
+                show="headings",
+                height=6,
+            )
+            for col, width in (("材料", 150), ("总需求", 120), ("每日收入", 120), ("攒齐天数", 120)):
+                self.single_char_detail_tree.heading(col, text=col)
+                self.single_char_detail_tree.column(col, width=width, anchor="center")
+            single_char_detail_scroll = ttk.Scrollbar(
+                single_char_detail_container, orient="vertical", command=self.single_char_detail_tree.yview
+            )
+            self.single_char_detail_tree.configure(yscrollcommand=single_char_detail_scroll.set)
+            self.single_char_detail_tree.pack(side="left", fill="both", expand=True)
+            single_char_detail_scroll.pack(side="right", fill="y")
 
             income_frame = ttk.LabelFrame(stats_tab, text="每日材料收入")
             income_frame.pack(fill="x", padx=10, pady=8)
@@ -789,7 +808,7 @@ if tk is not None:
                     width=10,
                 ).grid(row=idx, column=3, padx=4, pady=4, sticky="w")
 
-            result_frame = ttk.LabelFrame(stats_tab, text="材料总需求 + 攒齐时间")
+            result_frame = ttk.LabelFrame(stats_tab, text="全部角色 材料总需求 + 攒齐时间")
             result_frame.pack(fill="both", expand=True, padx=10, pady=8)
             result_container = ttk.Frame(result_frame)
             result_container.pack(fill="both", expand=True, padx=8, pady=8)
@@ -833,7 +852,7 @@ if tk is not None:
             ranking_container.pack(fill="both", expand=True, padx=8, pady=8)
             self.ranking_tree = ttk.Treeview(
                 ranking_container,
-                columns=("排名", "角色", "记录数", "总材料", "最慢天数"),
+                columns=("排名", "角色", "记录数", "总材料", "最慢天数", "最慢材料"),
                 show="headings",
                 height=12,
             )
@@ -843,6 +862,7 @@ if tk is not None:
                 ("记录数", 100),
                 ("总材料", 120),
                 ("最慢天数", 120),
+                ("最慢材料", 150),
             ):
                 self.ranking_tree.heading(col, text=col)
                 self.ranking_tree.column(col, width=width, anchor="center")
@@ -1140,6 +1160,8 @@ if tk is not None:
                 for item in self.todo_items
                 if str(item.get("角色", "")).strip() == name and is_todo_pending(item)
             ]
+            for item in self.single_char_detail_tree.get_children():
+                self.single_char_detail_tree.delete(item)
             if not selected_records:
                 self.single_character_result_var.set(f"{name} 暂无升级计划")
                 return
@@ -1157,6 +1179,15 @@ if tk is not None:
             self.single_character_result_var.set(
                 f"{name}：计划 {result['record_count']} 条，材料总量 {total_count}，预计培养天数 {days_text} 天"
             )
+            eta = result["eta"]
+            for field, _label in MATERIAL_FIELDS:
+                need = totals[field]
+                if need == 0:
+                    continue
+                days_val = eta[field]
+                days_str = "∞" if days_val is None else str(days_val)
+                income_str = self._format_number(daily_income[field])
+                self.single_char_detail_tree.insert("", "end", values=(field, need, income_str, days_str))
 
         def _collect_daily_income(self) -> dict:
             return {field: as_float(var.get()) for field, var in self.daily_income_vars.items()}
@@ -1208,9 +1239,7 @@ if tk is not None:
         def _format_number(value: float) -> str:
             if value is None:
                 return ""
-            if abs(value - round(value)) < 1e-6:
-                return str(int(round(value)))
-            return f"{value:.2f}".rstrip("0").rstrip(".")
+            return str(int(round(value)))
 
         def refresh_result_view(self, save: bool = False) -> None:
             totals = calculate_total_materials(self.todo_items, self.data["upgrade_material_costs"])
@@ -1251,19 +1280,24 @@ if tk is not None:
                 total_materials = sum(entry["materials"].values())
                 eta = calculate_eta_days(entry["materials"], daily_income)
                 max_days = 0
+                max_field = ""
                 has_infinite = False
                 for field, _label in MATERIAL_FIELDS:
                     days = eta[field]
                     if days is None:
-                        has_infinite = True
-                    else:
-                        max_days = max(max_days, days)
+                        if not has_infinite:
+                            has_infinite = True
+                            max_field = field
+                    elif not has_infinite and days > max_days:
+                        max_days = days
+                        max_field = field
                 rows.append(
                     {
                         "name": name,
                         "record_count": entry["record_count"],
                         "total_materials": total_materials,
                         "max_days": None if has_infinite else max_days,
+                        "max_field": max_field,
                     }
                 )
             return rows
@@ -1294,7 +1328,7 @@ if tk is not None:
                 self.ranking_tree.insert(
                     "",
                     "end",
-                    values=(idx, row["name"], row["record_count"], row["total_materials"], days_text),
+                    values=(idx, row["name"], row["record_count"], row["total_materials"], days_text, row.get("max_field", "")),
                 )
 
         def persist_data(self, show_message: bool = False) -> None:
