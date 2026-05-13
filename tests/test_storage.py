@@ -20,6 +20,7 @@ class StorageTests(unittest.TestCase):
         self.assertEqual("R10", data["upgrade_material_costs"][-1]["升级阶段"])
         self.assertEqual(10, data["upgrade_material_costs"][0]["金金金钱"])
         self.assertEqual([], data["upgrade_records"])
+        self.assertEqual([], data["todo_list"])
         self.assertIn("daily_income", data)
 
     def test_load_save_round_trip(self):
@@ -28,12 +29,14 @@ class StorageTests(unittest.TestCase):
             original = build_default_data()
             original["upgrade_material_costs"][0]["电路板"] = 123
             original["upgrade_records"].append({"角色": "CharacterA", "fromR": 1, "toR": 3})
+            original["todo_list"].append({"角色": "CharacterA", "任务": "Farm gear", "状态": "未完成"})
             original["daily_income"]["电路板"] = 15
             save_data(original, data_file)
 
             loaded = load_data(data_file)
             self.assertEqual(123, loaded["upgrade_material_costs"][0]["电路板"])
             self.assertEqual("CharacterA", loaded["upgrade_records"][0]["角色"])
+            self.assertEqual("Farm gear", loaded["todo_list"][0]["任务"])
             self.assertEqual(15, loaded["daily_income"]["电路板"])
 
     def test_load_data_resets_invalid_json(self):
