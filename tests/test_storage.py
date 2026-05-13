@@ -3,9 +3,11 @@ import unittest
 from pathlib import Path
 
 from app import (
+    MATERIAL_FIELDS,
     build_default_data,
     calculate_eta_days,
     calculate_record_materials,
+    calculate_single_character_cultivation,
     calculate_total_materials,
     load_data,
     save_data,
@@ -63,6 +65,38 @@ class StorageTests(unittest.TestCase):
         eta = calculate_eta_days(total, {"金金金钱": 9, "灰信号": 0})
         self.assertEqual(12, eta["金金金钱"])
         self.assertIsNone(eta["灰信号"])
+
+    def test_single_character_cultivation_days(self):
+        data = build_default_data()
+        records = [
+            {"角色": "CharacterA", "fromR": 1, "toR": 3},
+            {"角色": "CharacterA", "fromR": 3, "toR": 4},
+            {"角色": "CharacterB", "fromR": 1, "toR": 2},
+        ]
+        daily_income = {field: 1000 for field, _label in MATERIAL_FIELDS}
+        daily_income["金金金钱"] = 10
+        result = calculate_single_character_cultivation(
+            records,
+            data["upgrade_material_costs"],
+            daily_income,
+            "CharacterA",
+        )
+        self.assertEqual("CharacterA", result["name"])
+        self.assertEqual(2, result["record_count"])
+        self.assertEqual(150, result["total_materials"]["金金金钱"])
+        self.assertEqual(15, result["max_days"])
+        self.assertEqual(15, result["eta"]["金金金钱"])
+
+    def test_single_character_cultivation_days_infinite_when_income_missing(self):
+        data = build_default_data()
+        records = [{"角色": "CharacterA", "fromR": 1, "toR": 2}]
+        result = calculate_single_character_cultivation(
+            records,
+            data["upgrade_material_costs"],
+            {"金金金钱": 1},
+            "CharacterA",
+        )
+        self.assertIsNone(result["max_days"])
 
 
 if __name__ == "__main__":
