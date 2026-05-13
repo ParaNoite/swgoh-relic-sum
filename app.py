@@ -21,7 +21,8 @@ def get_user_data_dir() -> Path:
     elif sys.platform == "darwin":
         base_path = Path.home() / "Library" / "Application Support"
     else:
-        base_path = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
+        base = os.environ.get("XDG_DATA_HOME")
+        base_path = Path(base) if base else Path.home() / ".local/share"
     return base_path / "swgoh-relic-sum"
 
 
@@ -424,7 +425,11 @@ if tk is not None:
             action_frame = ttk.Frame(self)
             action_frame.pack(fill="x", padx=10, pady=(0, 8))
             ttk.Button(action_frame, text="保存数据", command=self.save_all_data).pack(side="left", padx=6)
-            ttk.Button(action_frame, text="重新计算", command=self.refresh_result_view).pack(side="left", padx=6)
+            ttk.Button(
+                action_frame,
+                text="重新计算",
+                command=lambda: self.refresh_result_view(save=True),
+            ).pack(side="left", padx=6)
 
         def add_record(self) -> None:
             name = self.name_var.get().strip()
@@ -441,6 +446,8 @@ if tk is not None:
             self.records.append({"角色": name, "fromR": from_r, "toR": to_r})
             self.refresh_records_view()
             self.refresh_result_view()
+            self.persist_data()
+            self.clear_record_selection()
 
         def update_selected_record(self) -> None:
             if self.selected_record_index is None:
@@ -461,6 +468,8 @@ if tk is not None:
                 self.records[self.selected_record_index] = {"角色": name, "fromR": from_r, "toR": to_r}
             self.refresh_records_view()
             self.refresh_result_view()
+            self.persist_data()
+            self.clear_record_selection()
 
         def delete_selected_record(self) -> None:
             selected = self.records_tree.selection()
@@ -474,6 +483,7 @@ if tk is not None:
 
             self.refresh_records_view()
             self.refresh_result_view()
+            self.persist_data()
             self.clear_record_selection()
 
         def clear_record_selection(self) -> None:
@@ -521,6 +531,7 @@ if tk is not None:
             self.todo_items.append({"角色": name, "任务": task, "状态": status})
             self.refresh_todo_view()
             self.persist_data()
+            self.clear_todo_selection()
 
         def update_selected_todo(self) -> None:
             if self.selected_todo_index is None:
@@ -539,6 +550,7 @@ if tk is not None:
                 self.todo_items[self.selected_todo_index] = {"角色": name, "任务": task, "状态": status}
             self.refresh_todo_view()
             self.persist_data()
+            self.clear_todo_selection()
 
         def delete_selected_todo(self) -> None:
             selected = self.todo_tree.selection()
@@ -588,7 +600,7 @@ if tk is not None:
         def _collect_daily_income(self) -> dict:
             return {field: as_int(var.get()) for field, var in self.daily_income_vars.items()}
 
-        def refresh_result_view(self) -> None:
+        def refresh_result_view(self, save: bool = False) -> None:
             daily_income = self._collect_daily_income()
             totals = calculate_total_materials(self.records, self.data["upgrade_material_costs"])
             eta = calculate_eta_days(totals, daily_income)
@@ -601,7 +613,8 @@ if tk is not None:
                 days_text = "∞" if days is None else str(days)
                 self.result_tree.insert("", "end", values=(field, totals[field], daily_income[field], days_text))
             self.refresh_ranking_view()
-            self.persist_data()
+            if save:
+                self.persist_data()
 
         def _build_ranking_rows(self) -> list[dict]:
             per_character: dict[str, dict] = {}
